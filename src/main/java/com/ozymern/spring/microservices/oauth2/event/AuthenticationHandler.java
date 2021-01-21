@@ -1,6 +1,7 @@
 package com.ozymern.spring.microservices.oauth2.event;
 
 
+import brave.Tracer;
 import com.ozymern.spring.microservices.commons.models.entity.User;
 import com.ozymern.spring.microservices.oauth2.service.UserService;
 import feign.FeignException;
@@ -21,6 +22,12 @@ public class AuthenticationHandler implements AuthenticationEventPublisher {
     @Autowired
     private UserService userService;
 
+
+    //para traza en zipkin
+    @Autowired
+    private Tracer tracer;
+
+
     //para manejar exito en la autenticacion
     @Override
     public void publishAuthenticationSuccess(Authentication authentication) {
@@ -30,9 +37,9 @@ public class AuthenticationHandler implements AuthenticationEventPublisher {
 
         User user = userService.finByUsername(authentication.getName());
 
-        if (user.getAttempts()!=null && user.getAttempts()>0){
+        if (user.getAttempts() != null && user.getAttempts() > 0) {
             user.setAttempts(0);
-            userService.update(user,user.getId());
+            userService.update(user, user.getId());
         }
     }
 
@@ -52,11 +59,14 @@ public class AuthenticationHandler implements AuthenticationEventPublisher {
                 user.setAttempts(0);
             }
             LOGGER.info("[publishAuthenticationFailure]  Numero de intentos  actuales es de {}", user.getAttempts());
-
+            tracer.currentSpan().tag("intentos.login", "Numero de intentos  actuales es de " + user.getAttempts());
             user.setAttempts(user.getAttempts() + 1);
             LOGGER.info("[publishAuthenticationFailure]  Numero de intentos  despues es de {}", user.getAttempts());
+            tracer.currentSpan().tag("intentos.login.despues", "Numero de intentos  despues es de " + user.getAttempts());
             if (user.getAttempts() >= 3) {
                 LOGGER.info("[publishAuthenticationFailure]  usuario {} desabilitado por {} intentos", user.getName(), user.getAttempts());
+
+                tracer.currentSpan().tag("intentos.login.desabilitado", "Numero de intentos  despues es de " + user.getAttempts());
                 user.setEnabled(false);
             }
 
@@ -64,7 +74,7 @@ public class AuthenticationHandler implements AuthenticationEventPublisher {
 
         } catch (FeignException f) {
             LOGGER.error("[publishAuthenticationFailure] error login  al optener el usuario {}", f.getMessage());
-
+            tracer.currentSpan().tag(" error login", "error login  al optener el usuario " + f.getMessage());
         }
 
     }

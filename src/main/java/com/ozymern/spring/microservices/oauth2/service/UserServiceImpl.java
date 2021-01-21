@@ -1,5 +1,6 @@
 package com.ozymern.spring.microservices.oauth2.service;
 
+import brave.Tracer;
 import com.ozymern.spring.microservices.commons.models.entity.User;
 import com.ozymern.spring.microservices.oauth2.remoto.UserFeignClient;
 import feign.FeignException;
@@ -23,6 +24,10 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private UserFeignClient userFeignClient;
+
+    @Autowired
+    private Tracer tracer;
+
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserServiceImpl.class);
 
@@ -79,6 +84,8 @@ public class UserServiceImpl implements UserService {
             };
         } catch (FeignException f) {
             LOGGER.error("Error: no existe usuario en la BD error {}",f.getMessage());
+            //add nuevo tag para visualizar la traza en zipkin
+            tracer.currentSpan().tag("error.getUser","no existe usuario en la BD "+f.getMessage());
             throw new UsernameNotFoundException("Error: no existe usuario en la BD");
         }
     }
